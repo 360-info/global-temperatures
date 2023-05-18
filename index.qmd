@@ -38,10 +38,13 @@ monthly_data |>
 annual_temps
 ```
 
+Finally, we want to rescale these to the 1850-1900 baseline. Let's calculate it, and then subtract that from the temps to rescale.
+
+Oh! let's add a smoother too.
+
 ```{r}
 #| label: rescale-export
-# finally, we want to rescale these to the 1850-1900 baseline.
-# let's calculate it, and then subtract that from the temps to rescale
+
 annual_temps |>
   filter(between(year, 1850, 1900)) |>
   pull(annual) |>
@@ -49,10 +52,14 @@ annual_temps |>
 baseline
 
 annual_temps |>
-  mutate(annual_1850to1900 = annual - baseline) |>
+  mutate(annual_1850to1900 = annual - baseline) %>%
+  mutate(annual_smoothed =
+    c(loess(annual_1850to1900 ~ year, data = .)$fitted, NA)) |>
   write_csv(here("data", "hadcrut5-global-temperatures-annual.csv")) ->
 annual_temps_rescaled
 ```
+
+
 ```{r}
 #| label: visualise
 # and to verify, let's run the timeseries off
@@ -60,7 +67,7 @@ ggplot(annual_temps_rescaled) +
   aes(x = year, y = annual_1850to1900) +
   geom_point(colour = "grey", size = 2) +
   geom_line(colour = "grey", size = 0.5) +
-  geom_smooth(method = "loess", colour = "darkred", se = FALSE) +
+  geom_line(aes(y = annual_smoothed), colour = "darkred") +
   geom_hline(yintercept = 1.5, linetype = 2) +
   annotate("text",
     x = Inf, y = 1.525,
