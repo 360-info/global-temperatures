@@ -54,9 +54,15 @@ baseline
 annual_temps |>
   mutate(annual_1850to1900 = annual - baseline) %>%
   mutate(annual_smoothed =
-    c(loess(annual_1850to1900 ~ year, data = .)$fitted, NA)) |>
-  write_csv(here("data", "hadcrut5-global-temperatures-annual.csv")) ->
+    c(loess(annual_1850to1900 ~ year, data = .)$fitted, NA)) ->
 annual_temps_rescaled
+
+# write out to disk
+annual_temps_rescaled |>
+  mutate(
+    annual_1850to1900 = round(annual_1850to1900, 3),
+    annual_smoothed = round(annual_smoothed, 3)) |>
+  write_csv(here("data", "hadcrut5-global-temperatures-annual.csv")) 
 ```
 
 
