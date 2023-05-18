@@ -1,33 +1,78 @@
 ---
-title: "Container test"
+title: "Global temperatures processing"
 author: "James Goldie"
 format: html
 ---
 
-I love containers! So useful. Can we do R stuff in the rocker container? Let's see:
+We're going to get an up-to-date time series of global temperatures, which is available from CRU (available under the [Open Government Licence](http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/), which is CC BY-compatible).
+
 
 ```{r}
-#| label: rtest
-
-library(tibble)
-
-mydata <- tibble(x = 1:10, y = x^2)
-ojs_define(mydata)
+#| label: setup
+library(tidyverse)
+library(here)
 ```
 
-And maybe an Observable chart too?
-
-```{ojs}
-//| label: somechart
-
-Plot.plot({
-  marks: [
-    Plot.barY(transpose(mydata), {
-      x: "x",
-      y: "y"
-    })
-  ]
-})
+```{r}
+#| label: download
+# pull the data down. the columns are year, then monthly figures, then annual
+paste0(
+  "https://crudata.uea.ac.uk/",
+  "cru/data/temperature/HadCRUT5.0Analysis_gl.txt") |>
+  read_table(col_names = FALSE, na = "-9.999") |>
+  set_names(c("year", month.abb, "annual")) ->
+monthly_data
 ```
 
-Great!
+```{r}
+#| label: cut-to-annual
+# every second row is the % of available data. we'll drop those. we also only
+# need the annual figures
+monthly_data |>
+  mutate(n = seq_along(year)) |>
+  filter(n %% 2 == 1) |>
+  select(year, annual) ->
+annual_temps
+```
+
+```{r}
+#| label: rescale-export
+# finally, we want to rescale these to the 1850-1900 baseline.
+# let's calculate it, and then subtract that from the temps to rescale
+annual_temps |>
+  filter(between(year, 1850, 1900)) |>
+  pull(annual) |>
+  mean(na.rm = TRUE) ->
+baseline
+
+annual_temps |>
+  mutate(annual_1850to1900 = annual - baseline) |>
+  write_csv(here("data", "hadcrut5-global-temperatures-annual.csv")) ->
+annual_temps_rescaled
+```
+```{r}
+#| label: visualise
+# and to verify, let's run the timeseries off
+ggplot(annual_temps_rescaled) +
+  aes(x = year, y = annual_1850to1900) +
+  geom_point(colour = "grey", size = 2) +
+  geom_line(colour = "grey", size = 0.5) +
+  geom_smooth(method = "loess", colour = "darkred", se = FALSE) +
+  geom_hline(yintercept = 1.5, linetype = 2) +
+  annotate("text",
+    x = Inf, y = 1.525,
+    label = "1.5°C Paris Agreement limit",
+    vjust = "outward", hjust = "inward") +
+  geom_hline(yintercept = 0, linetype = 2) +
+  annotate("text",
+    x = Inf, y = -0.025,
+    label = "Pre-industrial temperatures",
+    vjust = "outward", hjust = "inward") +
+  scale_y_continuous(labels = scales::label_number(suffix = "°C")) +
+  theme_minimal() +
+  labs(
+    x = NULL, y = "Temperature (compared to pre-industrial average)",
+    title = "Global average temperature"
+  )
+
+```
