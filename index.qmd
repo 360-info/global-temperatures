@@ -22,6 +22,9 @@ paste0(
   read_table(col_names = FALSE, na = "-9.999") |>
   set_names(c("year", month.abb, "annual")) ->
 monthly_data
+
+# also remove the annual figure for 2023, which appears to be "so far"
+monthly_data[length(monthly_data$year) - 1, length(monthly_data)] <- NA_real_
 ```
 
 ```{r}
